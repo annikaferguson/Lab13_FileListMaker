@@ -1,18 +1,20 @@
 import java.awt.*;
+import java.io.*;
 import java.lang.reflect.Array;
+import java.nio.file.Files;
 import java.util.Scanner;
 import java.util.ArrayList;
-import java.io.IOException;
-import java.io.PrintWriter;
 import java.nio.file.Path;
 import javax.swing.JFileChooser;
 import javax.swing.filechooser.FileNameExtensionFilter;
-import java.io.File;
+
+import static java.lang.System.out;
+import static java.nio.file.StandardOpenOption.CREATE;
 
 public class Main {
     public static void main(String[] args)
     {
-        Scanner in = new Scanner(System.in);
+        Scanner pipe = new Scanner(System.in);
         ArrayList<String> arrList = new ArrayList<>();
 
         String switch1 = "";
@@ -21,10 +23,10 @@ public class Main {
         String name = "";
 
         do {
-            switch1 = Menu(in, arrList);
+            switch1 = Menu(pipe, arrList);
             switch(switch1) {
                 case "A":
-                    addToList(in, arrList);
+                    addToList(pipe, arrList);
                     needsToBeSaved = true;
                     break;
                 case "C":
@@ -32,11 +34,11 @@ public class Main {
                     needsToBeSaved = true;
                     break;
                 case"D":
-                    deleteFromList(in, arrList);
+                    deleteFromList(pipe, arrList);
                     needsToBeSaved = true;
                     break;
                 case "O":
-                    name = Open(in, arrList, needsToBeSaved);
+                    name = Open(pipe, arrList, needsToBeSaved);
                     break;
                 case "S":
                     saveFile(arrList, name);
@@ -46,7 +48,7 @@ public class Main {
                     Display(arrList);
                     break;
                 case"Q":
-                    if(SafeInput.getYNConfirm(in, "Are you sure? List will be lost"))
+                    if(SafeInput.getYNConfirm(pipe, "Are you sure? List will be lost"))
                     {
                         if(needsToBeSaved)
                         {
@@ -61,7 +63,7 @@ public class Main {
         } while(rerun);
     }
 
-    private static String Menu(Scanner in, ArrayList arrList)
+    private static String Menu(Scanner pipe, ArrayList arrList)
     {
         if(arrList.isEmpty())
         {
@@ -73,7 +75,7 @@ public class Main {
                 System.out.printf("   %d. %s\n", x + 1, arrList.get(x));
             }
         }
-        return SafeInput.getRegExString(in, "Select a meny option:\n   A: Add\n   C: Clear\n   D: Delete\n   O: Open\n   S: Save\n   V: View\n   Q: Quit\n", "[AaCcDdOoSsVvQq").toUpperCase();
+        return SafeInput.getRegExString(pipe, "Select a menu option:\n   A: Add\n   C: Clear\n   D: Delete\n   O: Open\n   S: Save\n   V: View\n   Q: Quit\n", "[AaCcDdOoSsVvQq]").toUpperCase();
     }
 
     public static void clearList(ArrayList arrList)
@@ -81,9 +83,9 @@ public class Main {
         arrList.clear();
     }
 
-    public static void addToList(Scanner in, ArrayList arrList)
+    public static void addToList(Scanner pipe, ArrayList arrList)
     {
-        String itemToAdd = SafeInput.getNonZeroLenString(in, "What do you want to add to the array?");
+        String itemToAdd = SafeInput.getNonZeroLenString(pipe, "What do you want to add to the array?");
         arrList.add(itemToAdd);
     }
 
@@ -96,9 +98,9 @@ public class Main {
         }
     }
 
-    public static void deleteFromList(Scanner in, ArrayList arrList)
+    public static void deleteFromList(Scanner pipe, ArrayList arrList)
     {
-        int itemToDelete = SafeInput.getRangedInt(in, "What item do you want to delete", 1, arrList.size());
+        int itemToDelete = SafeInput.getRangedInt(pipe, "What item do you want to delete", 1, arrList.size());
         arrList.remove(itemToDelete - 1);
         System.out.println(itemToDelete + " list item was deleted");
     }
@@ -130,12 +132,12 @@ public class Main {
         }
     }
 
-    private static String Open (Scanner in, ArrayList arrList, boolean needsToSaved)
+    private static String Open (Scanner pipe, ArrayList arrList, boolean needsToSaved)
     {
         if(needsToSaved)
         {
             String prompt = "New List loading, current list will be deleted";
-            boolean burnListYN = SafeInput.getYNConfirm(in, prompt);
+            boolean burnListYN = SafeInput.getYNConfirm(pipe, prompt);
             if(!burnListYN)
             {
                 return "";
@@ -155,27 +157,63 @@ public class Main {
         target = target.resolve("src");
         chooser.setCurrentDirectory(target.toFile());
 
-        try {
+        File selectedFile;
+        String rec = "";
+
+        ArrayList<String> lines = new ArrayList<>();
+
+        try
+        {
+            File workingDirectory = new File(System.getProperty("user.dir"));
+
+            chooser.setCurrentDirectory(workingDirectory);
+
             if(chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION)
             {
-                target = chooser.getSelectedFile().toPath();
-                inFile = new Scanner(target);
+                selectedFile = chooser.getSelectedFile();
+                Path file = selectedFile.toPath();
 
-                System.out.println("Opening File: " + target.getFileName());
+                InputStream in =
+                        new BufferedInputStream(Files.newInputStream(file, CREATE));
+                BufferedReader reader =
+                        new BufferedReader(new InputStreamReader(in));
 
-                while(inFile.nextLine())
+                int line = 0;
+                while(reader.ready())
                 {
-                    row = inFile.nextLine();
-                    arrList.add(row);
-                }
-                inFile.close();
+                    rec = reader.readLine();
+                    lines.add(rec);
+                    line++;
 
-            } else {
-                System.out.println("Please select file");
+                    System.out.printf("\nLine %4 %-60s ", line, rec);
+                }
+                for(String l:lines)
+                {
+                    System.out.println(l);
+                }
+
+                String fields[] = lines.get(5).split(", ");
+                for(String f:fields)
+                    System.out.println(f);
+
+                reader.close();
+                System.out.println("\n\nDate file read!");
             }
-        } catch (IOException e)
+            else
+            {
+                out.println("Failed to choose a file to process");
+                out.println("Run the program again!");
+                System.exit(0);
+            }
+        }
+        catch(FileNotFoundException e)
         {
-            System.out.println("Error");
+            out.println("File not found!");
+            e.printStackTrace();
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
         }
 
         return target.toFile().toString();
